@@ -1,35 +1,17 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-} from 'firebase/auth'
-import { auth } from '../lib/firebase'
+import { initializeApp } from 'firebase/app'
+import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
 
-const AuthContext = createContext(null)
-
-export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setSession(user)
-      setLoading(false)
-    })
-    return () => unsubscribe()
-  }, [])
-
-  const signIn = (email, password) =>
-    signInWithEmailAndPassword(auth, email, password)
-
-  const signOut = () => firebaseSignOut(auth)
-
-  return (
-    <AuthContext.Provider value={{ session, loading, signIn, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  )
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
-export const useAuth = () => useContext(AuthContext)
+const app = initializeApp(firebaseConfig)
+
+export const auth = getAuth(app)
+export const db = getFirestore(app)
