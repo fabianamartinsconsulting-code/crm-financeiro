@@ -1,24 +1,22 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import App from './App.jsx'
 import './index.css'
 
-alert('JS carregou! Vou tentar renderizar o app agora.')
-
-window.addEventListener('error', (e) => {
-  alert('ERRO: ' + (e.error ? (e.error.message + '\n' + e.error.stack) : e.message))
-})
-window.addEventListener('unhandledrejection', (e) => {
-  alert('ERRO (promise): ' + (e.reason && e.reason.message ? e.reason.message : e.reason))
-})
-
-try {
-  createRoot(document.getElementById('root')).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  )
-  alert('Render chamado sem erro.')
-} catch (err) {
-  alert('ERRO NO RENDER: ' + err.message + '\n' + err.stack)
+async function start() {
+  try {
+    const { default: App } = await import('./App.jsx')
+    createRoot(document.getElementById('root')).render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    )
+  } catch (err) {
+    document.getElementById('root').innerHTML =
+      '<pre style="white-space:pre-wrap;padding:16px;color:#900;font-size:14px;">' +
+      'ERRO AO CARREGAR APP: ' + (err && err.message) +
+      '\n\n' + (err && err.stack ? err.stack : '') +
+      '</pre>'
+  }
 }
+
+start()
