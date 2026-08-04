@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { collection, getDocs, query, where } from 'firebase/firestore'
+import { db } from '../lib/firebase'
 import Card from '../components/Card'
 import SplitBar from '../components/SplitBar'
 
@@ -17,14 +18,19 @@ export default function Dashboard() {
       inicioMes.setDate(1)
       const dataInicio = inicioMes.toISOString().slice(0, 10)
 
-      const [r, d, u] = await Promise.all([
-        supabase.from('receitas').select('*').gte('data', dataInicio),
-        supabase.from('despesas').select('*, categorias_despesa(nome)').gte('data', dataInicio),
-        supabase.from('usuarios').select('*'),
+      const receitasQuery = query(collection(db, 'receitas'), where('data', '>=', dataInicio))
+      const despesasQuery = query(collection(db, 'despesas'), where('data', '>=', dataInicio))
+      const usuariosQuery = collection(db, 'usuarios')
+
+      const [receitasSnap, despesasSnap, usuariosSnap] = await Promise.all([
+        getDocs(receitasQuery),
+        getDocs(despesasQuery),
+        getDocs(usuariosQuery),
       ])
-      setReceitas(r.data || [])
-      setDespesas(d.data || [])
-      setUsuarios(u.data || [])
+
+      setReceitas(receitasSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+      setDespesas(despesasSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
+      setUsuarios(usuariosSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })))
       setLoading(false)
     }
     load()
@@ -35,7 +41,7 @@ export default function Dashboard() {
   const saldo = totalReceitas - totalDespesas
 
   const porCategoria = despesas.reduce((acc, d) => {
-    const nome = d.categorias_despesa?.nome || 'Outros'
+    const nome = d.categoria_nome || 'Outros'
     acc[nome] = (acc[nome] || 0) + Number(d.valor)
     return acc
   }, {})
