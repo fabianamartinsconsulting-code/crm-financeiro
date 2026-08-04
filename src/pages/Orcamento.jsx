@@ -15,10 +15,14 @@ export default function Orcamento() {
   const [receitaInput, setReceitaInput] = useState('')
 
   const carregar = async () => {
-    const d = await carregarOrcamentoDoMes(referencia)
-    setDados(d)
-    setReceitaInput(String(d.resumo.receitaPlanejada))
-  }
+      try {
+        const d = await carregarOrcamentoDoMes(referencia)
+        setDados(d)
+        setReceitaInput(String(d.resumo.receitaPlanejada))
+      } catch (err) {
+        alert('ERRO NO ORÇAMENTO: ' + err.code + ' | ' + err.message)
+      }
+    }
 
   useEffect(() => { carregar() }, [])
 
