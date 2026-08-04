@@ -22,6 +22,7 @@ export default function Receitas() {
           query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
         )
         const usuariosSnap = await getDocs(collection(db, 'usuarios'))
+        alert('Usuários encontrados: ' + usuariosSnap.size)
 
         setReceitas(receitasSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
         setUsuarios(usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
