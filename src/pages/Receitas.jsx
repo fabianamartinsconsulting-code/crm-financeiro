@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore'
+import { db } from '../lib/firebase'
 
 const fmt = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const categoriasReceita = [
@@ -16,23 +17,26 @@ export default function Receitas() {
   })
 
   const load = async () => {
-    const [r, u] = await Promise.all([
-      supabase.from('receitas').select('*').order('data', { ascending: false }).limit(50),
-      supabase.from('usuarios').select('*'),
-    ])
-    setReceitas(r.data || [])
-    setUsuarios(u.data || [])
+    const receitasSnap = await getDocs(
+      query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
+    )
+    const usuariosSnap = await getDocs(collection(db, 'usuarios'))
+
+    setReceitas(receitasSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    setUsuarios(usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
   }
 
   useEffect(() => { load() }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const { error } = await supabase.from('receitas').insert([{ ...form, valor: Number(form.valor) }])
-    if (!error) {
+    try {
+      await addDoc(collection(db, 'receitas'), { ...form, valor: Number(form.valor) })
       setShowForm(false)
       setForm({ valor: '', data: new Date().toISOString().slice(0, 10), responsavel_id: '', categoria: '', observacoes: '' })
       load()
+    } catch (err) {
+      alert('ERRO AO SALVAR RECEITA: ' + err.message)
     }
   }
 
