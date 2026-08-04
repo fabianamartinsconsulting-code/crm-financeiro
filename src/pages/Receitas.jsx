@@ -17,13 +17,17 @@ export default function Receitas() {
   })
 
   const load = async () => {
-    const receitasSnap = await getDocs(
-      query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
-    )
-    const usuariosSnap = await getDocs(collection(db, 'usuarios'))
+      try {
+        const receitasSnap = await getDocs(
+          query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
+        )
+        const usuariosSnap = await getDocs(collection(db, 'usuarios'))
 
-    setReceitas(receitasSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
-    setUsuarios(usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
+        setReceitas(receitasSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
+        setUsuarios(usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      } catch (err) {
+        alert('ERRO AO CARREGAR: ' + err.code + ' | ' + err.message)
+      }
   }
 
   useEffect(() => { load() }, [])
