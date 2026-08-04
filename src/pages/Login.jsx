@@ -12,9 +12,13 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await signIn(email, password)
-    if (error) setError('E-mail ou senha incorretos.')
-    setLoading(false)
+    try {
+      await signIn(email, password)
+    } catch (err) {
+      setError('E-mail ou senha incorretos.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
