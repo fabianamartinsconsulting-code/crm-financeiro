@@ -18,7 +18,7 @@ export default function Receitas() {
 
   const load = async () => {
       try {
-        const receitasSnap = await getDocs(
+        const receitasSnap = await alert('Project ID em uso: ' + db.app.options.projectId) getDocs(
           query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
         )
         const usuariosSnap = await getDocs(collection(db, 'usuarios'))
