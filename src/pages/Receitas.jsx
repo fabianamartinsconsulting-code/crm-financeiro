@@ -1,7 +1,6 @@
-import { auth, db } from '../lib/firebase'
 import { useEffect, useState } from 'react'
 import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore'
-import { db } from '../lib/firebase'
+import { auth, db } from '../lib/firebase'
 
 const fmt = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const categoriasReceita = [
@@ -17,17 +16,10 @@ export default function Receitas() {
     valor: '', data: new Date().toISOString().slice(0, 10), responsavel_id: '', categoria: '', observacoes: '',
   })
 
- const load = async () => {
-    try {
-      alert('Project ID em uso: ' + db.app.options.projectId)
-      alert('Usuário autenticado: ' + (auth.currentUser ? auth.currentUser.uid : 'NINGUÉM LOGADO'))
-
-      const receitasSnap = await getDocs(
-        query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
-      )
-      ... const load = async () => {
+  const load = async () => {
       try {
         alert('Project ID em uso: ' + db.app.options.projectId)
+        alert('Usuário autenticado: ' + (auth.currentUser ? auth.currentUser.uid : 'NINGUÉM LOGADO'))
 
         const receitasSnap = await getDocs(
           query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
