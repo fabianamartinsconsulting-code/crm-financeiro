@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
-import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, orderBy, limit } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 
 const fmt = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+const emptyForm = {
+  nome: '', categoria_id: '', valor: '', data: new Date().toISOString().slice(0, 10),
+  pago_por_id: '', forma_pagamento: '', recorrente: false, observacoes: '',
+  parcelado: false, parcelas: '2',
+}
 
 // Soma "n" meses a uma data no formato 'YYYY-MM-DD', preservando o dia quando possível
 const addMonths = (dateStr, n) => {
@@ -19,11 +25,8 @@ export default function Despesas() {
   const [categorias, setCategorias] = useState([])
   const [usuarios, setUsuarios] = useState([])
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({
-    nome: '', categoria_id: '', valor: '', data: new Date().toISOString().slice(0, 10),
-    pago_por_id: '', forma_pagamento: '', recorrente: false, observacoes: '',
-    parcelado: false, parcelas: '2',
-  })
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(emptyForm)
 
   const load = async () => {
     try {
@@ -45,34 +48,72 @@ export default function Despesas() {
 
   useEffect(() => { load() }, [])
 
+  const resetForm = () => {
+    setForm(emptyForm)
+    setEditingId(null)
+    setShowForm(false)
+  }
+
+  const startEdit = (d) => {
+    setForm({
+      nome: d.nome || '',
+      categoria_id: d.categoria_id || '',
+      valor: String(d.valor ?? ''),
+      data: d.data || new Date().toISOString().slice(0, 10),
+      pago_por_id: d.pago_por_id || '',
+      forma_pagamento: d.forma_pagamento || '',
+      recorrente: !!d.recorrente,
+      observacoes: d.observacoes || '',
+      parcelado: false,
+      parcelas: '2',
+    })
+    setEditingId(d.id)
+    setShowForm(true)
+  }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Excluir esta despesa?')) return
+    try {
+      await deleteDoc(doc(db, 'despesas', id))
+      load()
+    } catch (err) {
+      alert('ERRO AO EXCLUIR: ' + err.message)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const { parcelado, parcelas, ...base } = form
-      const totalParcelas = parcelado ? Math.max(2, parseInt(parcelas, 10) || 2) : 1
-      const grupoParcela = totalParcelas > 1 ? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` : null
-
-      const inserts = []
-      for (let i = 0; i < totalParcelas; i++) {
-        inserts.push(addDoc(collection(db, 'despesas'), {
+      if (editingId) {
+        // Edição: atualiza só essa despesa, sem gerar parcelas novas
+        const { parcelado, parcelas, ...base } = form
+        await updateDoc(doc(db, 'despesas', editingId), {
           ...base,
           valor: Number(base.valor),
-          data: addMonths(base.data, i),
-          ...(totalParcelas > 1 ? {
-            parcela_atual: i + 1,
-            parcela_total: totalParcelas,
-            grupo_parcela: grupoParcela,
-          } : {}),
-        }))
-      }
-      await Promise.all(inserts)
+        })
+      } else {
+        // Criação: pode gerar várias parcelas
+        const { parcelado, parcelas, ...base } = form
+        const totalParcelas = parcelado ? Math.max(2, parseInt(parcelas, 10) || 2) : 1
+        const grupoParcela = totalParcelas > 1 ? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` : null
 
-      setShowForm(false)
-      setForm({
-        nome: '', categoria_id: '', valor: '', data: new Date().toISOString().slice(0, 10),
-        pago_por_id: '', forma_pagamento: '', recorrente: false, observacoes: '',
-        parcelado: false, parcelas: '2',
-      })
+        const inserts = []
+        for (let i = 0; i < totalParcelas; i++) {
+          inserts.push(addDoc(collection(db, 'despesas'), {
+            ...base,
+            valor: Number(base.valor),
+            data: addMonths(base.data, i),
+            ...(totalParcelas > 1 ? {
+              parcela_atual: i + 1,
+              parcela_total: totalParcelas,
+              grupo_parcela: grupoParcela,
+            } : {}),
+          }))
+        }
+        await Promise.all(inserts)
+      }
+
+      resetForm()
       load()
     } catch (err) {
       alert('ERRO AO SALVAR DESPESA: ' + err.message)
@@ -86,7 +127,7 @@ export default function Despesas() {
       <div className="flex justify-between items-center mb-4">
         <h1 className="font-display text-xl font-semibold text-ink">Despesas</h1>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => (showForm ? resetForm() : setShowForm(true))}
           className="bg-verde text-white text-sm font-body rounded-full px-4 py-2"
         >
           {showForm ? 'Cancelar' : '+ Nova'}
@@ -95,6 +136,9 @@ export default function Despesas() {
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-base border border-line rounded-2xl p-4 mb-4 flex flex-col gap-2">
+          {editingId && (
+            <p className="text-xs text-muted font-body -mb-1">Editando despesa existente</p>
+          )}
           <input placeholder="Nome" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })}
             className="border border-line rounded-lg px-3 py-2 text-sm font-body" required />
           <select value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}
@@ -122,28 +166,32 @@ export default function Despesas() {
             Despesa recorrente
           </label>
 
-          <label className="flex items-center gap-2 text-sm font-body text-muted">
-            <input type="checkbox" checked={form.parcelado}
-              onChange={(e) => setForm({ ...form, parcelado: e.target.checked })} />
-            Parcelado
-          </label>
+          {!editingId && (
+            <>
+              <label className="flex items-center gap-2 text-sm font-body text-muted">
+                <input type="checkbox" checked={form.parcelado}
+                  onChange={(e) => setForm({ ...form, parcelado: e.target.checked })} />
+                Parcelado
+              </label>
 
-          {form.parcelado && (
-            <input type="number" min="2" placeholder="Número de parcelas" value={form.parcelas}
-              onChange={(e) => setForm({ ...form, parcelas: e.target.value })}
-              className="border border-line rounded-lg px-3 py-2 text-sm font-body" required />
+              {form.parcelado && (
+                <input type="number" min="2" placeholder="Número de parcelas" value={form.parcelas}
+                  onChange={(e) => setForm({ ...form, parcelas: e.target.value })}
+                  className="border border-line rounded-lg px-3 py-2 text-sm font-body" required />
+              )}
+            </>
           )}
 
           <button type="submit" className="bg-petroleo text-white rounded-lg py-2.5 text-sm font-body mt-1">
-            {form.parcelado ? 'Salvar despesa parcelada' : 'Salvar despesa'}
+            {editingId ? 'Salvar alterações' : (form.parcelado ? 'Salvar despesa parcelada' : 'Salvar despesa')}
           </button>
         </form>
       )}
 
       <div className="flex flex-col gap-2">
         {despesas.map((d) => (
-          <div key={d.id} className="bg-base border border-line rounded-xl p-3 flex justify-between items-center">
-            <div>
+          <div key={d.id} className="bg-base border border-line rounded-xl p-3 flex justify-between items-center gap-2">
+            <button onClick={() => startEdit(d)} className="text-left flex-1">
               <p className="text-sm font-body text-ink">
                 {d.nome}
                 {d.parcela_total > 1 && (
@@ -151,8 +199,11 @@ export default function Despesas() {
                 )}
               </p>
               <p className="text-xs text-muted font-body">{nomeCategoria(d.categoria_id)} · {new Date(d.data).toLocaleDateString('pt-BR')}</p>
-            </div>
+            </button>
             <span className="text-sm font-mono font-nums text-petroleo">{fmt(d.valor)}</span>
+            <button onClick={() => handleDelete(d.id)} className="text-xs text-muted font-body px-2" aria-label="Excluir">
+              ✕
+            </button>
           </div>
         ))}
         {despesas.length === 0 && <p className="text-sm text-muted font-body text-center py-8">Nenhuma despesa lançada ainda.</p>}
