@@ -85,12 +85,40 @@ export default function Despesas() {
     e.preventDefault()
     try {
       if (editingId) {
-        // Edição: atualiza só essa despesa, sem gerar parcelas novas
         const { parcelado, parcelas, ...base } = form
-        await updateDoc(doc(db, 'despesas', editingId), {
-          ...base,
-          valor: Number(base.valor),
-        })
+
+        if (parcelado) {
+          // Transforma a despesa existente na parcela 1, e cria as próximas
+          const totalParcelas = Math.max(2, parseInt(parcelas, 10) || 2)
+          const grupoParcela = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+          await updateDoc(doc(db, 'despesas', editingId), {
+            ...base,
+            valor: Number(base.valor),
+            parcela_atual: 1,
+            parcela_total: totalParcelas,
+            grupo_parcela: grupoParcela,
+          })
+
+          const inserts = []
+          for (let i = 1; i < totalParcelas; i++) {
+            inserts.push(addDoc(collection(db, 'despesas'), {
+              ...base,
+              valor: Number(base.valor),
+              data: addMonths(base.data, i),
+              parcela_atual: i + 1,
+              parcela_total: totalParcelas,
+              grupo_parcela: grupoParcela,
+            }))
+          }
+          await Promise.all(inserts)
+        } else {
+          // Edição simples: atualiza só essa despesa, sem gerar parcelas novas
+          await updateDoc(doc(db, 'despesas', editingId), {
+            ...base,
+            valor: Number(base.valor),
+          })
+        }
       } else {
         // Criação: pode gerar várias parcelas
         const { parcelado, parcelas, ...base } = form
@@ -166,24 +194,29 @@ export default function Despesas() {
             Despesa recorrente
           </label>
 
-          {!editingId && (
-            <>
-              <label className="flex items-center gap-2 text-sm font-body text-muted">
-                <input type="checkbox" checked={form.parcelado}
-                  onChange={(e) => setForm({ ...form, parcelado: e.target.checked })} />
-                Parcelado
-              </label>
+          <label className="flex items-center gap-2 text-sm font-body text-muted">
+            <input type="checkbox" checked={form.parcelado}
+              onChange={(e) => setForm({ ...form, parcelado: e.target.checked })} />
+            Parcelado
+          </label>
 
-              {form.parcelado && (
-                <input type="number" min="2" placeholder="Número de parcelas" value={form.parcelas}
-                  onChange={(e) => setForm({ ...form, parcelas: e.target.value })}
-                  className="border border-line rounded-lg px-3 py-2 text-sm font-body" required />
+          {form.parcelado && (
+            <>
+              {editingId && (
+                <p className="text-xs text-muted font-body">
+                  Esta despesa vira a parcela 1, e as próximas serão criadas nos meses seguintes.
+                </p>
               )}
+              <input type="number" min="2" placeholder="Número de parcelas" value={form.parcelas}
+                onChange={(e) => setForm({ ...form, parcelas: e.target.value })}
+                className="border border-line rounded-lg px-3 py-2 text-sm font-body" required />
             </>
           )}
 
           <button type="submit" className="bg-petroleo text-white rounded-lg py-2.5 text-sm font-body mt-1">
-            {editingId ? 'Salvar alterações' : (form.parcelado ? 'Salvar despesa parcelada' : 'Salvar despesa')}
+            {form.parcelado
+              ? (editingId ? 'Parcelar despesa' : 'Salvar despesa parcelada')
+              : (editingId ? 'Salvar alterações' : 'Salvar despesa')}
           </button>
         </form>
       )}
