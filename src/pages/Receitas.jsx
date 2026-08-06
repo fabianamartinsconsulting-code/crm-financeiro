@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { collection, addDoc, getDocsFromServer, doc, getDoc, query, orderBy, limit } from 'firebase/firestore'
-import { auth, db } from '../lib/firebase'
+import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore'
+import { db } from '../lib/firebase'
 
 const fmt = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const categoriasReceita = [
@@ -18,27 +18,10 @@ export default function Receitas() {
 
   const load = async () => {
       try {
-        // TESTE: mostrar a config completa que o app está usando de fato
-        const cfg = db.app.options
-        alert(
-          'projectId: ' + cfg.projectId +
-          '\nauthDomain: ' + cfg.authDomain +
-          '\nstorageBucket: ' + cfg.storageBucket +
-          '\nappId: ' + cfg.appId
-        )
-
-        // TESTE: criar um documento de teste AGORA e tentar ler ele de volta
-        const novoTeste = await addDoc(collection(db, 'usuarios'), { nome: 'TESTE_DEBUG', criado_em: new Date().toISOString() })
-        alert('Documento de teste criado com ID: ' + novoTeste.id)
-
-        const testeDoc = await getDoc(doc(db, 'usuarios', novoTeste.id))
-        alert('Consegui ler de volta o documento que acabei de criar? ' + testeDoc.exists())
-
-        const receitasSnap = await getDocsFromServer(
+        const receitasSnap = await getDocs(
           query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
         )
-        const usuariosSnap = await getDocsFromServer(collection(db, 'usuarios'))
-        alert('Usuários encontrados: ' + usuariosSnap.size)
+        const usuariosSnap = await getDocs(collection(db, 'usuarios'))
 
         setReceitas(receitasSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
         setUsuarios(usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
