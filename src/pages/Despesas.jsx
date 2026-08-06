@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore'
+import { db } from '../lib/firebase'
 
 const fmt = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -14,27 +15,38 @@ export default function Despesas() {
   })
 
   const load = async () => {
-    const [d, c, u] = await Promise.all([
-      supabase.from('despesas').select('*, categorias_despesa(nome)').order('data', { ascending: false }).limit(50),
-      supabase.from('categorias_despesa').select('*').order('ordem'),
-      supabase.from('usuarios').select('*'),
-    ])
-    setDespesas(d.data || [])
-    setCategorias(c.data || [])
-    setUsuarios(u.data || [])
+    try {
+      const despesasSnap = await getDocs(
+        query(collection(db, 'despesas'), orderBy('data', 'desc'), limit(50))
+      )
+      const categoriasSnap = await getDocs(
+        query(collection(db, 'categorias_despesa'), orderBy('ordem'))
+      )
+      const usuariosSnap = await getDocs(collection(db, 'usuarios'))
+
+      setDespesas(despesasSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setCategorias(categoriasSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setUsuarios(usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    } catch (err) {
+      alert('ERRO AO CARREGAR: ' + err.code + ' | ' + err.message)
+    }
   }
 
   useEffect(() => { load() }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const { error } = await supabase.from('despesas').insert([{ ...form, valor: Number(form.valor) }])
-    if (!error) {
+    try {
+      await addDoc(collection(db, 'despesas'), { ...form, valor: Number(form.valor) })
       setShowForm(false)
       setForm({ nome: '', categoria_id: '', valor: '', data: new Date().toISOString().slice(0, 10), pago_por_id: '', forma_pagamento: '', recorrente: false, observacoes: '' })
       load()
+    } catch (err) {
+      alert('ERRO AO SALVAR DESPESA: ' + err.message)
     }
   }
+
+  const nomeCategoria = (id) => categorias.find((c) => c.id === id)?.nome || ''
 
   return (
     <div className="min-h-screen bg-soft px-4 pt-6 pb-24">
@@ -86,7 +98,7 @@ export default function Despesas() {
           <div key={d.id} className="bg-base border border-line rounded-xl p-3 flex justify-between items-center">
             <div>
               <p className="text-sm font-body text-ink">{d.nome}</p>
-              <p className="text-xs text-muted font-body">{d.categorias_despesa?.nome} · {new Date(d.data).toLocaleDateString('pt-BR')}</p>
+              <p className="text-xs text-muted font-body">{nomeCategoria(d.categoria_id)} · {new Date(d.data).toLocaleDateString('pt-BR')}</p>
             </div>
             <span className="text-sm font-mono font-nums text-petroleo">{fmt(d.valor)}</span>
           </div>
