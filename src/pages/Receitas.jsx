@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore'
+     import { useEffect, useState } from 'react'
+import { collection, addDoc, getDocsFromServer, query, orderBy, limit } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 
 const fmt = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -21,10 +21,10 @@ export default function Receitas() {
         alert('Project ID em uso: ' + db.app.options.projectId)
         alert('Usuário autenticado: ' + (auth.currentUser ? auth.currentUser.uid : 'NINGUÉM LOGADO'))
 
-        const receitasSnap = await getDocs(
+        const receitasSnap = await getDocsFromServer(
           query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
         )
-        const usuariosSnap = await getDocs(collection(db, 'usuarios'))
+        const usuariosSnap = await getDocsFromServer(collection(db, 'usuarios'))
         alert('Usuários encontrados: ' + usuariosSnap.size)
 
         setReceitas(receitasSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
@@ -98,3 +98,4 @@ export default function Receitas() {
     </div>
   )
 }
+       
