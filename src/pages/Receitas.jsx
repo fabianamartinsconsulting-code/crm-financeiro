@@ -1,5 +1,5 @@
-     import { useEffect, useState } from 'react'
-import { collection, addDoc, getDocsFromServer, query, orderBy, limit } from 'firebase/firestore'
+import { useEffect, useState } from 'react'
+import { collection, addDoc, getDocsFromServer, doc, getDoc, query, orderBy, limit } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 
 const fmt = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -18,8 +18,9 @@ export default function Receitas() {
 
   const load = async () => {
       try {
-        alert('Project ID em uso: ' + db.app.options.projectId)
-        alert('Usuário autenticado: ' + (auth.currentUser ? auth.currentUser.uid : 'NINGUÉM LOGADO'))
+        // TESTE: buscar o documento específico direto pelo ID conhecido
+        const testeDoc = await getDoc(doc(db, 'usuarios', 'fPtlFE2ny2zCYgoCNvs4'))
+        alert('Documento fPtlFE2ny2zCYgoCNvs4 existe? ' + testeDoc.exists() + ' | dados: ' + JSON.stringify(testeDoc.data()))
 
         const receitasSnap = await getDocsFromServer(
           query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
@@ -98,4 +99,3 @@ export default function Receitas() {
     </div>
   )
 }
-       
