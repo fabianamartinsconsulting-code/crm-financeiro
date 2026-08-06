@@ -18,9 +18,21 @@ export default function Receitas() {
 
   const load = async () => {
       try {
-        // TESTE: buscar o documento específico direto pelo ID conhecido
-        const testeDoc = await getDoc(doc(db, 'usuarios', 'fPtlFE2ny2zCYgoCNvs4'))
-        alert('Documento fPtlFE2ny2zCYgoCNvs4 existe? ' + testeDoc.exists() + ' | dados: ' + JSON.stringify(testeDoc.data()))
+        // TESTE: mostrar a config completa que o app está usando de fato
+        const cfg = db.app.options
+        alert(
+          'projectId: ' + cfg.projectId +
+          '\nauthDomain: ' + cfg.authDomain +
+          '\nstorageBucket: ' + cfg.storageBucket +
+          '\nappId: ' + cfg.appId
+        )
+
+        // TESTE: criar um documento de teste AGORA e tentar ler ele de volta
+        const novoTeste = await addDoc(collection(db, 'usuarios'), { nome: 'TESTE_DEBUG', criado_em: new Date().toISOString() })
+        alert('Documento de teste criado com ID: ' + novoTeste.id)
+
+        const testeDoc = await getDoc(doc(db, 'usuarios', novoTeste.id))
+        alert('Consegui ler de volta o documento que acabei de criar? ' + testeDoc.exists())
 
         const receitasSnap = await getDocsFromServer(
           query(collection(db, 'receitas'), orderBy('data', 'desc'), limit(50))
