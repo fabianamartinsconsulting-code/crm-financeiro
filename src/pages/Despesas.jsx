@@ -4,6 +4,16 @@ import { db } from '../lib/firebase'
 
 const fmt = (n) => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+// Soma "n" meses a uma data no formato 'YYYY-MM-DD', preservando o dia quando possível
+const addMonths = (dateStr, n) => {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1 + n, d)
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 export default function Despesas() {
   const [despesas, setDespesas] = useState([])
   const [categorias, setCategorias] = useState([])
@@ -12,6 +22,7 @@ export default function Despesas() {
   const [form, setForm] = useState({
     nome: '', categoria_id: '', valor: '', data: new Date().toISOString().slice(0, 10),
     pago_por_id: '', forma_pagamento: '', recorrente: false, observacoes: '',
+    parcelado: false, parcelas: '2',
   })
 
   const load = async () => {
@@ -37,9 +48,31 @@ export default function Despesas() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      await addDoc(collection(db, 'despesas'), { ...form, valor: Number(form.valor) })
+      const { parcelado, parcelas, ...base } = form
+      const totalParcelas = parcelado ? Math.max(2, parseInt(parcelas, 10) || 2) : 1
+      const grupoParcela = totalParcelas > 1 ? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` : null
+
+      const inserts = []
+      for (let i = 0; i < totalParcelas; i++) {
+        inserts.push(addDoc(collection(db, 'despesas'), {
+          ...base,
+          valor: Number(base.valor),
+          data: addMonths(base.data, i),
+          ...(totalParcelas > 1 ? {
+            parcela_atual: i + 1,
+            parcela_total: totalParcelas,
+            grupo_parcela: grupoParcela,
+          } : {}),
+        }))
+      }
+      await Promise.all(inserts)
+
       setShowForm(false)
-      setForm({ nome: '', categoria_id: '', valor: '', data: new Date().toISOString().slice(0, 10), pago_por_id: '', forma_pagamento: '', recorrente: false, observacoes: '' })
+      setForm({
+        nome: '', categoria_id: '', valor: '', data: new Date().toISOString().slice(0, 10),
+        pago_por_id: '', forma_pagamento: '', recorrente: false, observacoes: '',
+        parcelado: false, parcelas: '2',
+      })
       load()
     } catch (err) {
       alert('ERRO AO SALVAR DESPESA: ' + err.message)
@@ -69,7 +102,7 @@ export default function Despesas() {
             <option value="">Categoria</option>
             {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
-          <input type="number" step="0.01" placeholder="Valor" value={form.valor}
+          <input type="number" step="0.01" placeholder={form.parcelado ? 'Valor de cada parcela' : 'Valor'} value={form.valor}
             onChange={(e) => setForm({ ...form, valor: e.target.value })}
             className="border border-line rounded-lg px-3 py-2 text-sm font-mono" required />
           <input type="date" value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })}
@@ -82,13 +115,27 @@ export default function Despesas() {
           <input placeholder="Forma de pagamento" value={form.forma_pagamento}
             onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })}
             className="border border-line rounded-lg px-3 py-2 text-sm font-body" />
+
           <label className="flex items-center gap-2 text-sm font-body text-muted">
             <input type="checkbox" checked={form.recorrente}
               onChange={(e) => setForm({ ...form, recorrente: e.target.checked })} />
             Despesa recorrente
           </label>
+
+          <label className="flex items-center gap-2 text-sm font-body text-muted">
+            <input type="checkbox" checked={form.parcelado}
+              onChange={(e) => setForm({ ...form, parcelado: e.target.checked })} />
+            Parcelado
+          </label>
+
+          {form.parcelado && (
+            <input type="number" min="2" placeholder="Número de parcelas" value={form.parcelas}
+              onChange={(e) => setForm({ ...form, parcelas: e.target.value })}
+              className="border border-line rounded-lg px-3 py-2 text-sm font-body" required />
+          )}
+
           <button type="submit" className="bg-petroleo text-white rounded-lg py-2.5 text-sm font-body mt-1">
-            Salvar despesa
+            {form.parcelado ? 'Salvar despesa parcelada' : 'Salvar despesa'}
           </button>
         </form>
       )}
@@ -97,7 +144,12 @@ export default function Despesas() {
         {despesas.map((d) => (
           <div key={d.id} className="bg-base border border-line rounded-xl p-3 flex justify-between items-center">
             <div>
-              <p className="text-sm font-body text-ink">{d.nome}</p>
+              <p className="text-sm font-body text-ink">
+                {d.nome}
+                {d.parcela_total > 1 && (
+                  <span className="ml-2 text-xs text-muted font-body">({d.parcela_atual}/{d.parcela_total})</span>
+                )}
+              </p>
               <p className="text-xs text-muted font-body">{nomeCategoria(d.categoria_id)} · {new Date(d.data).toLocaleDateString('pt-BR')}</p>
             </div>
             <span className="text-sm font-mono font-nums text-petroleo">{fmt(d.valor)}</span>
